@@ -12,3 +12,4 @@ dataset/
 # 가상환경
 venv/
 .venv/
+node_modules/

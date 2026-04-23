@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Image Analyzer</title>
+    <style>
+        /* 다크 모드 기반 깔끔한 디자인 */
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --primary-color: #bb86fc;
+            --secondary-color: #03dac6;
+            --text-color: #e0e0e0;
+            --error-color: #cf6679;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary-color);
+            margin-bottom: 30px;
+        }
+
+        .upload-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 이미지 미리보기 스타일 */
+        #previewContainer {
+            width: 100%;
+            height: 300px;
+            border: 2px dashed #444;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background-color: #1a1a1a;
+        }
+
+        #previewImage {
+            max-width: 100%;
+            max-height: 100%;
+            display: none;
+        }
+
+        .placeholder-text {
+            color: #666;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .custom-file-upload {
+            background-color: #333;
+            color: white;
+            padding: 12px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .custom-file-upload:hover {
+            background-color: #444;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            background-color: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            color: white;
+            resize: none;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: #000;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        /* 로딩 애니메이션 */
+        #loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: var(--secondary-color);
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 결과 창 스타일 */
+        #resultArea {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #2a2a2a;
+            border-radius: 12px;
+            display: none;
+            line-height: 1.6;
+        }
+
+        .result-label {
+            color: var(--secondary-color);
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>AI Image Analyzer</h1>
+    
+    <div class="upload-section">
+        <!-- 이미지 미리보기 영역 -->
+        <div id="previewContainer">
+            <span class="placeholder-text">이미지를 업로드하세요</span>
+            <img id="previewImage" src="" alt="Preview">
+        </div>
+
+        <label for="imageInput" class="custom-file-upload">이미지 선택하기</label>
+        <input type="file" id="imageInput" accept="image/*">
+
+        <!-- 질문 입력 영역 -->
+        <textarea id="questionInput" rows="3" placeholder="이미지에 대해 궁금한 점을 물어보세요..."></textarea>
+
+        <!-- 분석 버튼 -->
+        <button id="analyzeBtn">분석하기</button>
+    </div>
+
+    <!-- 로딩 표시 -->
+    <div id="loading">
+        <div class="spinner"></div>
+        <span>AI가 분석 중입니다...</span>
+    </div>
+
+    <!-- 결과 표시 영역 -->
+    <div id="resultArea">
+        <span class="result-label">분석 결과:</span>
+        <div id="resultContent"></div>
+    </div>
+</div>
+
+<script>
+    const imageInput = document.getElementById('imageInput');
+    const previewImage = document.getElementById('previewImage');
+    const placeholderText = document.querySelector('.placeholder-text');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const loading = document.getElementById('loading');
+    const resultArea = document.getElementById('resultArea');
+    const resultContent = document.getElementById('resultContent');
+
+    // 이미지 파일 선택 시 미리보기 처리
+    imageInput.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImage.src = e.target.result;
+                previewImage.style.display = 'block';
+                placeholderText.style.display = 'none';
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // 분석하기 버튼 클릭 이벤트
+    analyzeBtn.addEventListener('click', async () => {
+        const file = imageInput.files[0];
+        const question = document.getElementById('questionInput').value;
+
+        if (!file) {
+            alert('이미지를 선택해주세요!');
+            return;
+        }
+
+        // UI 상태 변경: 로딩 시작
+        analyzeBtn.disabled = true;
+        loading.style.display = 'block';
+        resultArea.style.display = 'none';
+
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('question', question);
+
+        try {
+            // Node.js 서버의 /analyze 엔드포인트로 데이터 전송
+            const response = await fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            // 결과 화면 표시
+            resultArea.style.display = 'block';
+            if (data.success !== false) {
+                resultContent.innerText = data.result || JSON.stringify(data, null, 2);
+            } else {
+                resultContent.innerText = '에러: ' + data.message;
+                resultContent.style.color = 'var(--error-color)';
+            }
+
+        } catch (error) {
+            console.error('분석 요청 중 오류:', error);
+            alert('분석 요청 중 오류가 발생했습니다.');
+        } finally {
+            // UI 상태 복구
+            analyzeBtn.disabled = false;
+            loading.style.display = 'none';
+        }
+    });
+</script>
+
+</body>
+</html>
